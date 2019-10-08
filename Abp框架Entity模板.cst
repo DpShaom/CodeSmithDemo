@@ -1,0 +1,206 @@
+﻿<%-- 
+Name:modelDemo
+Author: shaom
+Description: 一个Entity模板演示
+--%>
+<%@ Template Language="C#" TargetLanguage="Text" %>
+<%--引入下面的类库，操作数据库必备的。不要纠结加入就行啦。: Entity<<%=GetCSharpVariableType(SourceTable.PrimaryKey)%>>--%>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer" %>
+<%-- 命名空间 --%>
+<%@ Property Name="NameSpace" Type="String" Category="参数" Description="命名空间" Default="" Optional="True"%>
+
+<%--声明数据库的参数，在左下角的Database属性中，选择要操作的数据库名称--%>
+<%@ Property Name="SourceTable" Type="SchemaExplorer.TableSchema" Category="Table" Description="Table that the object is based on." %>
+
+<%--  <%@ Property Name="Tables" Type="SchemaExplorer.TableSchemaCollection" Default="" Optional="True" Category="Strings" Description="--表--" %>--%> 
+
+<%--<%@ Property Name="Columns" Type="SchemaExplorer.ColumnSchemaCollection" Default="" Optional="True" Category="Strings" Description="--表--" %>--%>
+
+<%--SourceDatabase, 是你选择数据库的属性类，涵盖数据库的名称，创建时间，字符串链接，描述等等，自己可以点点看 --%>
+
+using Abp.Domain.Entities;
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace <%=NameSpace %>
+{
+    [Serializable]
+    <%--类名为表明，根据Abp实体类名，继承Entiy部分为固定主键的类型，主键类型通过脚本自定义方法GetPrimaryKeyType获取--%>
+    <%if(SourceTable.HasPrimaryKey){ %>
+    public class <%=SourceTable.Name %>: Entity<<%=GetPrimaryKeyType(SourceTable) %>>
+    {    
+         <%--循环表内列--%>
+         <% int index=1; %>
+         <% foreach (ColumnSchema column in SourceTable.Columns) {%>
+            <%--生成注释--%>
+            /// <summary>
+            /// <%=column.Description %>
+            /// </summary>
+            <%--判断当前列是否是主键--%>
+            <% if(column.IsPrimaryKeyMember) {%>
+            [Key]
+            <%if(SourceTable.PrimaryKey.MemberColumns.Count==1) {%>
+            [Column("<%=column.Name %>")]
+            public override <%=GetCSharpVariableType(column) %> Id {get; set;}
+            <%}else if(SourceTable.PrimaryKey.MemberColumns.Count>1){ %>
+            [Column(Order = <%=index%>)]
+            <% if(index>1) {%>
+            <%--获取主键字段类型并转换成CSharp类型--%>
+            public <%=GetCSharpVariableType(column) %> <%=column.Name %> {get; set;}
+            <%}else{ %>
+            public override <%=GetCSharpVariableType(column) %> Id {get; set;}
+            <%} index++;} %>
+            <% }else{%>
+            <%--普通字段的生成--%>
+            public <%=GetCSharpVariableType(column) %> <%=column.Name %> {get; set;}
+            <% } %>
+            
+         <% }%>   
+    }
+    <%}else{ %>
+    public class <%=SourceTable.Name %>
+    
+    {    
+         <%--循环表内列--%>
+         <% foreach (ColumnSchema column in SourceTable.Columns) {%>
+            <%--生成注释--%>
+            /// <summary>
+            /// <%=column.Description %>
+            /// </summary>            
+            <%--普通字段的生成--%>
+            public <%=GetCSharpVariableType(column) %> <%=column.Name %> {get; set;}
+             
+         <% }%>   
+    }
+    <%} %>
+}
+
+
+<script runat="template">
+ 
+public string MakeSingle(string name)
+{
+    return name;
+}
+//根据骆驼命名法获取列名
+public string GetCamelName(ColumnSchema column)
+{
+    return column.Name.Substring(0, 1).ToLower() + column.Name.Substring(1);
+}
+public string GetCamelName(string value)
+{
+    return value.Substring(0, 1).ToLower() + value.Substring(1);
+}
+//根据Pascal命名法获取列名
+public string GetPascalName(ColumnSchema column)
+{
+    return column.Name.Substring(0, 1).ToUpper() + column.Name.Substring(1);
+}
+public string GetPascalName(string value)
+{
+    return value.Substring(0, 1).ToUpper() + value.Substring(1);
+}
+//根据表获取类名
+public string GetClassName(TableSchema table)
+{
+    return GetPascalName(MakeSingle(table.Name));
+}   
+//获取外键类型
+public string GetForeignKeyColumnType(ColumnSchema column)
+{        
+    return column.Table.ForeignKeys[0].PrimaryKeyTable.Name;
+}
+//获取外键名
+public string GetForeignKeyColumnName(ColumnSchema column)
+{    
+    if(column.Name.Substring(column.Name.Length-2).ToLower() == "id")
+    {
+        return column.Name.Substring(0,column.Name.Length-2);
+    }
+    else
+    {
+        return column.Name;
+    }
+}
+ 
+public string GetStructureParameter()
+{//int id,string name
+        string temp = "";
+        foreach(ColumnSchema column in SourceTable.NonPrimaryKeyColumns) 
+        {
+                if(column.IsForeignKeyMember) 
+                {
+                    temp += GetPascalName(GetForeignKeyColumnType(column)) + " " +GetCamelName(GetForeignKeyColumnName(column)) + ",";
+                }
+                else
+                {
+                    temp += GetCSharpVariableType(column) + " " + GetCamelName(column) + ",";
+                }
+        }
+        return temp.Substring(0,temp.Length-1);
+}
+//获取主键类型
+public string GetPrimaryKeyType(TableSchema table)
+{
+    if (table.PrimaryKey != null)
+    {
+        if (table.PrimaryKey.MemberColumns.Count == 1)
+        {
+            return GetCSharpVariableType(table.PrimaryKey.MemberColumns[0]);
+        }
+        else
+        {
+            return GetCSharpVariableType(table.PrimaryKey.MemberColumns[0]);
+            //throw new ApplicationException("This template will not work on primary keys with more than one member column.");
+        }
+    }
+    else
+    {
+        throw new ApplicationException("This template will only work on tables with a primary key.");
+    }
+}
+//通过字段类型获取CSharp对应的DB类型
+public string GetCSharpVariableType(ColumnSchema column)
+{
+    if (column.Name.EndsWith("TypeCode")) return column.Name;
+    
+    switch (column.DataType)
+    {
+        case DbType.AnsiString: return "string";
+        case DbType.AnsiStringFixedLength: return "string";
+        case DbType.Binary: return "byte[]";
+        case DbType.Boolean: return "bool";
+        case DbType.Byte: return "byte";
+        case DbType.Currency: return "decimal";
+        case DbType.Date: return "DateTime";
+        case DbType.DateTime: return "DateTime";
+        case DbType.Decimal: return "decimal";
+        case DbType.Double: return "double";
+        case DbType.Guid: return "Guid";
+        case DbType.Int16: return "short";
+        case DbType.Int32: return "int";
+        case DbType.Int64: return "long";
+        case DbType.Object: return "object";
+        case DbType.SByte: return "sbyte";
+        case DbType.Single: return "float";
+        case DbType.String: return "string";
+        case DbType.StringFixedLength: return "string";
+        case DbType.Time: return "TimeSpan";
+        case DbType.UInt16: return "ushort";
+        case DbType.UInt32: return "uint";
+        case DbType.UInt64: return "ulong";
+        case DbType.VarNumeric: return "decimal";
+        default:
+        {
+            return "__UNKNOWN__" + column.NativeType;
+        }
+    }
+}
+//获取文件名（即以表名命名的实体类类名）
+public override string GetFileName()
+{
+    return     GetClassName(SourceTable) + ".cs";
+}
+</script>

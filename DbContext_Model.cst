@@ -1,0 +1,61 @@
+﻿<%-- 
+Name:AbpContext_Model
+Author: shaom
+Description: 用于生成数据库上下文
+--%>
+<%@ Template Language="C#" TargetLanguage="Text" %>
+
+<%@ Assembly Name="CodeSmith.CustomProperties" %>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer" %>
+
+<%@ Property Name="ProjectName" Type="String" Category="参数" Description="项目名称" Default="" Optional="True"%>
+<%@ Property Name="SourceTables" Type="SchemaExplorer.TableSchemaCollection" Category="Table" Description="Table that the object is based on." %>
+
+using Abp.Dependency;
+using Abp.EntityFrameworkCore;
+using MeetingSystem.Common;
+using MeetingSystem.Entity;
+using MeetingSystem.QuestionEntity;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace <%=ProjectName%>.EntityFrameworkCore
+{
+    public class <%=ProjectName%>DbContext : AbpDbContext
+    {
+        <% foreach(var table in this.SourceTables){%>
+            /// <summary>
+            /// <%=table.Description %>
+            /// </summary>
+            public DbSet<<%=table.Name%>> <%=table.Name%> { get; set; }
+        <% }%>
+    }
+    
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    public <%=ProjectName%>DbContext(DbContextOptions<<%=ProjectName%>DbContext> options) : base(options)
+    {
+        _httpContextAccessor = IocManager.Instance.Resolve<IHttpContextAccessor>();
+    }
+    
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        <% foreach(var table in this.SourceTables){%>
+            /// <summary>
+            /// <%=table.Description %>主键映射
+            /// </summary>
+            modelBuilder.Entity<<%=table.Name%>>()
+                .HasKey(c => new {<% for(int i=0;i< table.PrimaryKey.MemberColumns.Count;i++){%><% if(i==0){%>c.Id<% if(i<table.PrimaryKey.MemberColumns.Count-1){%>,<%}%><%} else{%>c.<%=table.PrimaryKey.MemberColumns[i]%><% if(i<table.PrimaryKey.MemberColumns.Count-1){%>,<%}%><%}%><%}%>});
+        <% }%>
+    }
+}
+<script runat="template">
+
+</script>

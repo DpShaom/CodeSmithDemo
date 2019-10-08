@@ -1,0 +1,127 @@
+﻿<%-- 
+Name:主控模板
+Author: shaom
+Description: 用于控制批量循环生成模板的模板
+
+--%>
+<%@ Template Language="C#" TargetLanguage="Text" Debug="True" %>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer" %>
+<%-- 命名空间 --%>
+<%@ Property Name="NameSpace" Type="String" Category="参数" Description="命名空间" Default="HuaRui.Model.Wx" Optional="True"%>
+
+<%-- 注册实体层Entity模板 --%>
+<%@ Register Name="EntityTemplate" Template="C:\Users\邵敏\Desktop\generator\generator-71\Model\Abp框架Entity模板.cst" MergeProperties="Flase" ExcludeProperties=""%>
+<%@ Register Name="DtoTemplate" Template="C:\Users\邵敏\Desktop\generator\generator-71\Model\Dto_Model.cst" MergeProperties="Flase" ExcludeProperties=""%>
+<%@ Register Name="ContextTemplate" Template="C:\Users\邵敏\Desktop\generator\generator-71\Model\DbContext_Model.cst" MergeProperties="Flase" ExcludeProperties=""%>
+<%@ Register Name="ApplicationTemplate" Template="C:\Users\邵敏\Desktop\generator\generator-71\Model\Application_Model.cst" MergeProperties="Flase" ExcludeProperties=""%>
+<%@ Register Name="ReadMeTemplate" Template="C:\Users\邵敏\Desktop\generator\generator-71\Model\DbReadMe_MD.cst" MergeProperties="Flase" ExcludeProperties=""%>
+<%@ Property Name="SelectColumns" Type="SchemaExplorer.ColumnSchemaCollection" Default="" Optional="True" Category="选择表和列" Description="--表--" %>
+
+<%
+//创建实体层Entity类
+this.GenerateEntityClasses();
+
+Debug.WriteLine("OK");
+%>
+
+<script runat="template">
+    //解决方案输出路径
+    private string Directory = String.Empty;
+    
+    [Editor(typeof(System.Windows.Forms.Design.FolderNameEditor), typeof(System.Drawing.Design.UITypeEditor))] 
+    [Optional, NotChecked]
+    [DefaultValue("")]
+    public string OutputDirectory 
+    { 
+        get
+        {
+            return Directory;
+        }
+        set
+        {
+            if (value.EndsWith("\\")) value = value.Substring(0, value.Length -1);
+            Directory = value;
+        } 
+    }
+    
+    public string OutPutDbContextUrl
+    {
+        get
+        {
+            return OutputDirectory+"\\DbContext";
+        }
+    }
+    
+    public string OutPutDtoUrl
+    {
+        get{
+            return OutputDirectory+"\\Dto";
+        }        
+    }
+    
+        public string OutPutApplicationUrl
+    {
+        get{
+            return OutputDirectory+"\\Application";
+        }        
+    }
+    
+    private void GenerateEntityClasses()
+    {
+        //实体类模板
+        CodeTemplate Entity =new EntityTemplate();
+        //视图类模板
+        CodeTemplate dto =new DtoTemplate();
+        //上下文模板
+        CodeTemplate Context = new ContextTemplate();
+        //应用服务层，接口层模板
+        CodeTemplate Application = new ApplicationTemplate();
+        //数据库说明Md格式
+        CodeTemplate ReadMe =  new ReadMeTemplate();
+        
+        string tableList = string.Empty;
+        
+        //用于保存自定义选择的类
+        ColumnSchemaCollection list = new ColumnSchemaCollection();
+        
+        TableSchemaCollection Tables = new TableSchemaCollection();
+
+        for(var i=0;i<this.SelectColumns.Count;i++)
+        {
+            list.Add(SelectColumns[i]);
+            if((tableList!=string.Empty&&tableList.IndexOf(SelectColumns[i].Table.Name)<0)||i==SelectColumns.Count-1)
+            {
+                var index=i;
+                if(SelectColumns.Count>1)
+                    index=index-1;
+                Tables.Add(SelectColumns[index].Table);
+                string FileDirectory = OutPutDtoUrl +"\\"+ SelectColumns[index].Table.Name +"Dto.cs";   
+                string EntityDirectory = OutputDirectory +"\\"+ SelectColumns[index].Table.Name +".cs";
+                string ApplicationDirectory = OutPutApplicationUrl +"\\"+ SelectColumns[index].Table.Name +"AppService.cs";
+                string ReadMeDirectory = OutputDirectory +"\\"+ SelectColumns[index].Table.Name +".md";
+                //视图类
+                dto.SetProperty("SelectColumns",list);
+                dto.RenderToFile(FileDirectory,true);
+                //应用服务层+接口
+                Application.SetProperty("ProjectName",this.NameSpace);
+                Application.SetProperty("SourceTables",SelectColumns[index].Table);
+                Application.SetProperty("SelectColumns",list);
+                Application.RenderToFile(ApplicationDirectory,true);
+                //实体类
+                Entity.SetProperty("NameSpace",this.NameSpace);
+                Entity.SetProperty("SourceTable",SelectColumns[index].Table);
+                Entity.RenderToFile(EntityDirectory,true);
+                //说明格式
+                ReadMe.SetProperty("Table",SelectColumns[index].Table);
+                ReadMe.RenderToFile(ReadMeDirectory,true);
+                list.Clear();
+            }
+            tableList+=SelectColumns[i].Table.Name+",";
+        }
+        
+        Context.SetProperty("SourceTables",Tables);
+        Context.SetProperty("ProjectName",this.NameSpace);
+        Context.RenderToFile(OutPutDbContextUrl+"\\"+this.NameSpace+"DBContext.cs",true);
+    }
+</script>

@@ -1,0 +1,161 @@
+﻿<%-- 
+Name:Application_Model
+Author: shaom
+Description: 用于生成Application层服务及接口
+--%>
+<%@ Template Language="C#" TargetLanguage="Text" %>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer" %>
+
+<%@ Property Name="ProjectName" Type="String" Category="参数" Description="项目名称" Default="" Optional="True"%>
+<%@ Property Name="SourceTables" Type="SchemaExplorer.TableSchema" Category="Table" Description="Table that the object is based on." %>
+<%@ Property Name="SelectColumns" Type="SchemaExplorer.ColumnSchemaCollection" Default="" Optional="True" Category="Strings" Description="--表--" %>
+
+using Abp.Application.Services;
+using Abp.Application.Services.Dto;
+using Abp.Domain.Repositories;
+using MeetingSystem.Hy_InvitationList.Dto;
+using System.Linq;
+using System.Linq.Dynamic.Core;
+using System;
+using System.Collections.Generic;
+using Abp.Linq.Extensions;
+using MeetingSystem.Common;
+using Abp.AutoMapper;
+using MeetingSystem.Enum;
+using System.Text.RegularExpressions;
+using MeetingSystem.Tool;
+using MeetingSystem.sms_Issend;
+using MeetingSystem.sms_Issend.Dto;
+using MeetingSystem.Dto;
+using Senparc.Weixin.MP.AdvancedAPIs.TemplateMessage;
+using Newtonsoft.Json;
+using MeetingSystem.Base;
+using MeetingSystem.EntityFrameworkCore;
+using MeetingSystem.sys_PushMessageLog.Dto;
+using MeetingSystem.sys_PushMessageLog;
+using MeetingSystem.Entity;
+
+namespace <%=ProjectName%>.<%=SourceTables.Name%>
+{
+    public class <%=SourceTables.Name%>AppService : <%=ProjectName%>AppServiceBase, I<%=SourceTables.Name%>AppService
+    {
+        private readonly IRepository<Entity.<%=SourceTables.Name%>> _<%=SourceTables.Name%>Repository;
+        
+        public <%=SourceTables.Name%>AppService(IRepository<Entity.<%=SourceTables.Name%>> <%=SourceTables.Name%>Repository)
+        {
+            _<%=SourceTables.Name%>Repository=<%=SourceTables.Name%>Repository;
+        }
+        
+        ///<summary>
+        ///表<%=SourceTables.Name%>获取列表方法
+        ///</summary>
+        public PagedResultDto<<%=SourceTables.Name%>> Get<%=SourceTables.Name%>List(int id, string keyword,
+                                                           string open_id, int pageindex, int pagesize)
+        {
+            var query =(from o in _<%=SourceTables.Name%>Repository.GetAll()                         
+                         where o.Id == id && !o.IsDelete
+                         select new <%=SourceTables.Name%>
+                         {
+                             <% foreach(var column in SourceTables.Columns){%>
+                                <%=column.Name%> = o.<%=column.Name%>
+                             <%} %>
+                         }).OrderByDescending(o=>o.ModifyDate);
+            var count = query.Count();
+            var result = query.OrderByDescending(o=>o.ModifyDate).PageBy(pageindex, pagesize).ToList();
+            return new PagedResultDto<<%=SourceTables.Name%>>(count, result);
+        }
+        
+        ///<summary>
+        ///表<%=SourceTables.Name%>更新or新建方法
+        ///</summary>
+        public AjaxResult SaveOrUpdate<%=SourceTables.Name%>(<%=SourceTables.Name%>Dto dto)
+        {
+            var result=new AjaxResult(false,"操作失败");
+            try{
+                //如果int类主键值为0说明是新增操作，如果是其他类型的主键则用其他判断手法
+                if(dto.Id==0)
+                {
+                    //如果不是int类型主键需要加入新主键赋值
+                    _<%=SourceTables.Name%>Repository.Add(new <%=SourceTables.Name%>{
+                        <% foreach(var c in SelectColumns){%>
+                            <%=c.Name %>=dto.<%=c.Name %>
+                        <%} %>
+                    });
+                }
+                //更新操作
+                else
+                {
+                    //首先根据传入的Dto主键获取数据库最新的记录
+                    var update_model= _<%=SourceTables.Name%>Repository.GetAll().Where(o=>o.Id==dto.Id).FirstOrDefault();
+                    //将Dto的值赋给查询结果
+                    <% foreach(var c in SelectColumns){%>
+                    <%if(c.Name=="Id") continue; %>
+                    update_model.<%=c.Name %> = dto.<%=c.Name %>;
+                    <%} %>
+                    _<%=SourceTables.Name%>Repository.Update(update_model);
+                }
+                //这里根据个自定义的AjaxResult结果状态赋值，可能是IsSuccess也可能是其他
+                result.isok=true;
+                result.message="操作成功";
+            }
+            catch(Exception ex)
+            {
+                result.message=ex.Message;
+            }
+            return result;
+        }
+        
+        ///<summary>
+        ///表<%=SourceTables.Name%>删除方法
+        ///</summary>
+        public AjaxResult Remove<%=SourceTables.Name%>(int id)
+        {
+            var result=new AjaxResult(false,"操作失败");
+            try
+            {
+                //首先根据传入的Dto主键获取数据库最新的记录
+                var remove_model= _<%=SourceTables.Name%>Repository.GetAll().Where(o=>o.Id==id).FirstOrDefault();
+                if(remove_model!=null)
+                    _<%=SourceTables.Name%>Repository.Delete(remove_model);
+                else
+                    throw new Exception("记录不存在");
+            
+                //这里根据个自定义的AjaxResult结果状态赋值，可能是IsSuccess也可能是其他
+                result.isok=true;
+                result.message="操作成功";
+            }
+            catch(Exception ex)
+            {
+                result.message=ex.Message;
+            }
+        }
+        
+        
+    }
+    
+    public interface I<%=SourceTables.Name%>AppService : IApplicationService
+    {
+        ///<summary>
+        ///表<%=SourceTables.Name%>获取列表方法
+        ///</summary>
+        PagedResultDto<<%=SourceTables.Name%>> Get<%=SourceTables.Name%>List(int id, string keyword,
+                                                          string open_id, int pageindex, int pagesize);
+        ///<summary>
+        ///表<%=SourceTables.Name%>更新or新建方法
+        ///</summary>
+        AjaxResult SaveOrUpdate<%=SourceTables.Name%>(<%=SourceTables.Name%>Dto dto);
+        ///<summary>
+        ///表<%=SourceTables.Name%>删除方法
+        ///</summary>
+        AjaxResult Remove<%=SourceTables.Name%>(int id);
+    }
+}
+
+<script runat="template">
+// My methods here.
+public string SampleMethod()
+{
+  return "Method output.";
+}
+</script>

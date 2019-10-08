@@ -1,0 +1,136 @@
+﻿<%-- 
+Name:Dto_Model
+Author: shaom
+Description: 用于创建视图类
+--%>
+<%@ Template Language="C#" TargetLanguage="Text" %>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer" %>
+
+<%@ Property Name="SelectColumns" Type="SchemaExplorer.ColumnSchemaCollection" Default="" Optional="True" Category="Strings" Description="--表--" %>
+using Abp.Domain.Entities;
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace <%=SelectColumns[0].Table.Name %>.Dto
+{
+    [Serializable]
+    public class <%=SelectColumns[0].Table.Name %>Dto
+    {     
+        <%--循环表内列--%>
+        <% foreach (var column in SelectColumns) { %>
+             <%--生成注释--%>
+            /// <summary>
+            /// <%=column.Description%>
+            /// </summary>
+            public <%=GetCSharpVariableType(column) %> <%=column.Name %> {get; set;}
+        <% }%>  
+    }
+}
+
+<script runat="template">
+ 
+public string MakeSingle(string name)
+{
+    return name;
+}
+//根据骆驼命名法获取列名
+public string GetCamelName(ColumnSchema column)
+{
+    return column.Name.Substring(0, 1).ToLower() + column.Name.Substring(1);
+}
+public string GetCamelName(string value)
+{
+    return value.Substring(0, 1).ToLower() + value.Substring(1);
+}
+//根据Pascal命名法获取列名
+public string GetPascalName(ColumnSchema column)
+{
+    return column.Name.Substring(0, 1).ToUpper() + column.Name.Substring(1);
+}
+public string GetPascalName(string value)
+{
+    return value.Substring(0, 1).ToUpper() + value.Substring(1);
+}
+//根据表获取类名
+public string GetClassName(TableSchema table)
+{
+    return GetPascalName(MakeSingle(table.Name));
+}   
+//获取外键类型
+public string GetForeignKeyColumnType(ColumnSchema column)
+{        
+    return column.Table.ForeignKeys[0].PrimaryKeyTable.Name;
+}
+//获取外键名
+public string GetForeignKeyColumnName(ColumnSchema column)
+{    
+    if(column.Name.Substring(column.Name.Length-2).ToLower() == "id")
+    {
+        return column.Name.Substring(0,column.Name.Length-2);
+    }
+    else
+    {
+        return column.Name;
+    }
+}
+ 
+//获取主键类型
+public string GetPrimaryKeyType(TableSchema table)
+{
+    if (table.PrimaryKey != null)
+    {
+        if (table.PrimaryKey.MemberColumns.Count == 1)
+        {
+            return GetCSharpVariableType(table.PrimaryKey.MemberColumns[0]);
+        }
+        else
+        {
+            return GetCSharpVariableType(table.PrimaryKey.MemberColumns[0]);
+            //throw new ApplicationException("This template will not work on primary keys with more than one member column.");
+        }
+    }
+    else
+    {
+        throw new ApplicationException("This template will only work on tables with a primary key.");
+    }
+}
+//通过字段类型获取CSharp对应的DB类型
+public string GetCSharpVariableType(ColumnSchema column)
+{
+    if (column.Name.EndsWith("TypeCode")) return column.Name;
+    
+    switch (column.DataType)
+    {
+        case DbType.AnsiString: return "string";
+        case DbType.AnsiStringFixedLength: return "string";
+        case DbType.Binary: return "byte[]";
+        case DbType.Boolean: return "bool";
+        case DbType.Byte: return "byte";
+        case DbType.Currency: return "decimal";
+        case DbType.Date: return "DateTime";
+        case DbType.DateTime: return "DateTime";
+        case DbType.Decimal: return "decimal";
+        case DbType.Double: return "double";
+        case DbType.Guid: return "Guid";
+        case DbType.Int16: return "short";
+        case DbType.Int32: return "int";
+        case DbType.Int64: return "long";
+        case DbType.Object: return "object";
+        case DbType.SByte: return "sbyte";
+        case DbType.Single: return "float";
+        case DbType.String: return "string";
+        case DbType.StringFixedLength: return "string";
+        case DbType.Time: return "TimeSpan";
+        case DbType.UInt16: return "ushort";
+        case DbType.UInt32: return "uint";
+        case DbType.UInt64: return "ulong";
+        case DbType.VarNumeric: return "decimal";
+        default:
+        {
+            return "__UNKNOWN__" + column.NativeType;
+        }
+    }
+}
+</script>
